@@ -1,0 +1,47 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Civic Signal: where should the next project go?</title>
+<style>
+:root{--bg:#f2f4f0;--ink:#15232b;--mute:#5d6d75;--line:#cfd7d3;--acc:#0f6b8f;--hot:#c8471b;--card:#fff}
+@media(prefers-color-scheme:dark){:root{--bg:#10191e;--ink:#e6eeea;--mute:#93a5ac;--line:#2a3a41;--acc:#5bb6d6;--hot:#ff8a5c;--card:#172329}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Source Sans 3","Segoe UI",system-ui,sans-serif}
+header{padding:28px 24px 8px;max-width:1150px;margin:auto}h1{font:600 30px/1.15 Georgia,"Times New Roman",serif;margin:0 0 6px}
+header p{margin:0;color:var(--mute);max-width:70ch}
+main{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:20px;max-width:1150px;margin:auto;padding:16px 24px 40px}
+@media(max-width:860px){main{grid-template-columns:1fr}}
+section{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:16px}
+h2{font-size:16px;margin:0 0 10px}.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+button{font:inherit;color:var(--ink);background:none;border:1px solid var(--line);border-radius:4px;padding:4px 10px;cursor:pointer}
+button[aria-pressed=true]{background:var(--acc);border-color:var(--acc);color:#fff}button:focus-visible,input:focus-visible{outline:2px solid var(--hot);outline-offset:2px}
+svg{width:100%;height:auto;background:var(--bg);border-radius:4px}
+label{display:grid;grid-template-columns:120px 1fr 40px;gap:8px;align-items:center;font-size:13px;margin:4px 0}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:5px 6px;border-bottom:1px solid var(--line)}td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+.bar{display:inline-block;height:7px;background:var(--acc);border-radius:2px;vertical-align:middle}.note{color:var(--mute);font-size:12px;margin-top:8px}
+</style></head><body>
+<header><h1>Where should the next project go?</h1>
+<p>Synthetic citizen requests in six languages, corrected for who can afford to speak up, combined with infrastructure gaps and existing funding. Move the sliders to see whether the ranking holds.</p></header>
+<main>
+<section><h2>Demand map</h2><div class="tabs" id="tabs" role="group" aria-label="Sector"></div>
+<svg id="map" viewBox="0 0 400 320" role="img" aria-label="Districts sized by priority score"></svg>
+<p class="note" id="stats"></p></section>
+<section><h2>Ranked projects</h2><div id="sliders"></div>
+<table><thead><tr><th>District</th><th>Sector</th><th class="n">Score</th><th class="n">Stays in top 10</th></tr></thead><tbody id="rank"></tbody></table>
+<p class="note">Stays in top 10 = share of 500 random weight settings (Python side) where the project remains in the top 10. A human decides; this only ranks.</p></section>
+</main>
+<script>
+const D=/*DATA*/;let W={...D.weights},S="all";
+const sectors=["all",...new Set(D.rows.map(r=>r.sector))],L={demand:"Citizen demand",severity:"Urgency",gap:"Infrastructure gap",vulnerability:"Vulnerable people",cost_eff:"Cost-effectiveness",funded:"Already funded (−)"};
+const P=r=>Object.keys(W).reduce((a,k)=>a+W[k]*r[k+"_n"]*(k==="funded"?-1:1),0);
+const $=id=>document.getElementById(id);
+$("tabs").innerHTML=sectors.map(s=>`<button aria-pressed="${s===S}" data-s="${s}">${s}</button>`).join("");
+$("tabs").onclick=e=>{if(e.target.dataset.s){S=e.target.dataset.s;[...$("tabs").children].forEach(b=>b.setAttribute("aria-pressed",b.dataset.s===S));draw()}};
+$("sliders").innerHTML=Object.keys(W).map(k=>`<label>${L[k]}<input type="range" min="0" max="1" step="0.05" value="${W[k]}" data-k="${k}"><span id="v${k}">${W[k]}</span></label>`).join("");
+$("sliders").oninput=e=>{W[e.target.dataset.k]=+e.target.value;$("v"+e.target.dataset.k).textContent=e.target.value;draw()};
+$("stats").textContent=`${D.stats.raw} requests received, ${D.stats.dedup} after removing repeat submissions.`;
+function draw(){const rows=D.rows.filter(r=>S==="all"||r.sector===S).map(r=>({...r,p:P(r)}));
+ const best={};rows.forEach(r=>{if(!best[r.district]||r.p>best[r.district].p)best[r.district]=r});
+ const v=Object.values(best),max=Math.max(...v.map(r=>r.p)),min=Math.min(...v.map(r=>r.p));
+ $("map").innerHTML=v.map(r=>{const t=(r.p-min)/(max-min+1e-9);return `<g><circle cx="${20+r.x*360}" cy="${20+r.y*280}" r="${5+t*16}" fill="${t>.66?"var(--hot)":"var(--acc)"}" fill-opacity="${.25+t*.6}"><title>${r.district} · ${r.sector} · ${r.p.toFixed(2)}</title></circle><text x="${20+r.x*360}" y="${24+r.y*280}" font-size="8" text-anchor="middle" fill="currentColor">${r.district}</text></g>`}).join("");
+ rows.sort((a,b)=>b.p-a.p);
+ $("rank").innerHTML=rows.slice(0,12).map(r=>`<tr><td>${r.district}</td><td>${r.sector}</td><td class="n">${r.p.toFixed(2)}</td><td class="n"><span class="bar" style="width:${r.stability*50}px"></span> ${Math.round(r.stability*100)}%</td></tr>`).join("")}
+draw();
+</script></body></html>
